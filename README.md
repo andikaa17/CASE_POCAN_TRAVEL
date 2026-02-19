@@ -25,7 +25,7 @@ Aplikasi pemesanan tiket bus online.
 
 ## File ERD
 
-`docs/erd/desain-erd.drawio`
+`docs/erd/POCAN-TRAVEL.drawio`
 
 ---
 
