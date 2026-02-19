@@ -8,11 +8,11 @@ Aplikasi pemesanan tiket bus online.
 |-------  |------------|
 | users   | Data pengguna |
 | buses   | Data bus |
-| routes     | Rute perjalanan |
-| schedules | Jadwal bus |
+| routes  | Rute perjalanan |
+| schedules| Jadwal bus |
 | bookings | Pemesanan tiket |
 | payments | Pembayaran |
-| seats | Kursi bus |
+| seats    | Kursi bus |
 
 ## Cara Hubungin Tabel
 
