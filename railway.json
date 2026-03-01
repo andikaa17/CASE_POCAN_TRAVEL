@@ -1,0 +1,9 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "composer install --no-dev"
+  },
+  "deploy": {
+    "startCommand": "./start.sh"
+  }
+}
