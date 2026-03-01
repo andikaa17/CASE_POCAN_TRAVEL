@@ -28,7 +28,10 @@ class DatabaseSeeder extends Seeder
         $this->call([
             BusSeeder::class,
             RouteSeeder::class,
-            ScheduleSeeder::class,
+            // ScheduleSeeder::class, // <-- GANTI DENGAN INI:
+            ScheduleTemplateSeeder::class, // <-- TEMPLATE DULU
+            // NANTI JADWAL DI-GENERATE OTOMATIS PAKAI COMMAND
+            SeatSeeder::class,
         ]);
     }
 }

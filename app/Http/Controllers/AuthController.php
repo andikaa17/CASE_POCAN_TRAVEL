@@ -6,11 +6,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
+    /**
+     * Register user baru
+     */
     public function register(Request $request)
     {
+         \Log::info('Register request:', $request->all());
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -19,6 +24,7 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
+            \Log::error('Register validation failed:', $validator->errors()->toArray());
             return response()->json([
                 'success' => false,
                 'message' => 'Validasi gagal',
@@ -34,19 +40,27 @@ class AuthController extends Controller
             'role' => 'customer'
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Kirim email verifikasi
+        event(new Registered($user));
+
+        // ===== PENTING! JANGAN KASIH TOKEN DULU =====
+        // User HARUS verifikasi email dulu sebelum bisa login
+        // Makanya token TIDAK dibuat di sini!
 
         return response()->json([
             'success' => true,
-            'message' => 'Registrasi berhasil',
+            'message' => 'Registrasi berhasil! Silakan cek email untuk verifikasi.',
             'data' => [
                 'user' => $user,
-                'token' => $token,
-                'token_type' => 'Bearer'
+                // 'token' => $token,  // <-- COMMENT / HAPUS!
+                // 'token_type' => 'Bearer'
             ]
         ], 201);
     }
 
+    /**
+     * Login user
+     */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -72,6 +86,19 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // ===== CEK APAKAH EMAIL SUDAH VERIFIED =====
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email belum diverifikasi. Silakan cek email Anda.',
+                'data' => [
+                    'email' => $user->email,
+                    'need_verification' => true
+                ]
+            ], 403); // 403 Forbidden
+        }
+
+        // Buat token hanya jika email sudah terverifikasi
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -85,6 +112,9 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Logout user (hapus token)
+     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -96,6 +126,9 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Get current user profile
+     */
     public function me(Request $request)
     {
         return response()->json([

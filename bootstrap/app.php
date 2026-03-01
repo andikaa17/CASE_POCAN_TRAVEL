@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\ApiKeyMiddleware; // <-- IMPORT MIDDLEWARE
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,11 +13,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Daftarin middleware alias DISINI, BUKAN di Kernel.php
-        $middleware->alias([
-            'api.key' => \App\Http\Middleware\ApiKeyMiddleware::class,
-        ]);
-    })
+    $middleware->alias([
+        'api.key' => ApiKeyMiddleware::class,
+    ]);
+    
+    // ===== UNCOMMENT INI =====
+    $middleware->api(prepend: [
+        'api.key', // <-- UNCOMMENT!
+    ]);
+})
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

@@ -14,11 +14,13 @@ class BookingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'schedule_id' => 'required|exists:schedules,id',
-            'passengers' => 'required|array|min:1',
-            'passengers.*.seat_id' => 'required|exists:seats,id',
-            'passengers.*.passenger_name' => 'required|string|max:255',
-            'passengers.*.passenger_phone' => 'required|string|max:15',
-            'passengers.*.passenger_email' => 'required|email'
+            'seat_ids' => 'required|array|min:1',
+            'seat_ids.*' => 'exists:seats,id',
+            'passengers_data' => 'required|array|min:1',
+            'passengers_data.*.name' => 'required|string|max:255',
+            'passengers_data.*.age' => 'required|integer|min:1|max:100',
+            'passengers_data.*.id_card' => 'required|string|max:16',
+            'passengers_data.*.phone' => 'nullable|string|max:14',
         ]);
 
         if ($validator->fails()) {
@@ -29,8 +31,9 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $seatIds = collect($request->passengers)->pluck('seat_id')->toArray();
+        $seatIds = $request->seat_ids;
         
+        // Cek ketersediaan kursi
         $unavailableSeats = Seat::whereIn('id', $seatIds)
             ->where('is_available', false)
             ->get();
@@ -43,50 +46,118 @@ class BookingController extends Controller
             ], 400);
         }
 
-        $schedule = Schedule::with('route')->find($request->schedule_id);
+        $schedule = Schedule::with('bus.seats')->find($request->schedule_id);
         
-        if ($schedule->available_seats < count($request->passengers)) {
+        if ($schedule->available_seats < count($seatIds)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Kursi tidak mencukupi',
-                'data' => null
+                'message' => 'Kursi tidak mencukupi'
             ], 400);
         }
 
-        $totalPrice = $schedule->price * count($request->passengers);
+        $totalPrice = $schedule->price * count($seatIds);
 
         $booking = Booking::create([
             'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
             'user_id' => $request->user()->id,
             'schedule_id' => $request->schedule_id,
             'seat_ids' => $seatIds,
-            'passengers_data' => $request->passengers,
-            'total_passengers' => count($request->passengers),
+            'passengers_data' => $request->passengers_data,
+            'total_passengers' => count($seatIds),
             'total_price' => $totalPrice,
             'status' => 'pending'
         ]);
 
+        // Update status kursi
         Seat::whereIn('id', $seatIds)->update(['is_available' => false]);
-        $schedule->decrement('available_seats', count($request->passengers));
+        
+        // Update available seats di schedule
+        $schedule->decrement('available_seats', count($seatIds));
+
+        // Ambil data kursi lengkap untuk response
+        $seatsData = Seat::whereIn('id', $seatIds)->get();
 
         return response()->json([
             'success' => true,
             'message' => 'Booking berhasil',
-            'data' => $booking
+            'data' => [
+                'id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'schedule_id' => $booking->schedule_id,
+                'seat_ids' => $booking->seat_ids,
+                'seats' => $seatsData->map(function($seat) {
+                    return [
+                        'id' => $seat->id,
+                        'seat_number' => $seat->seat_number,
+                        'floor' => $seat->floor
+                    ];
+                }),
+                'total_passengers' => $booking->total_passengers,
+                'total_price' => $booking->total_price,
+                'status' => $booking->status,
+                'created_at' => $booking->created_at
+            ]
         ], 201);
     }
 
     public function myBookings(Request $request)
     {
         $bookings = Booking::where('user_id', $request->user()->id)
-            ->with(['schedule.bus', 'schedule.route', 'payment'])
+            ->with(['schedule.bus', 'schedule.route'])
             ->orderBy('created_at', 'desc')
             ->get();
+
+        $formattedBookings = $bookings->map(function($booking) {
+            // Ambil data kursi lengkap berdasarkan seat_ids
+            $seats = Seat::whereIn('id', $booking->seat_ids ?? [])->get();
+            
+            return [
+                'id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'schedule_id' => $booking->schedule_id,
+                'seat_ids' => $booking->seat_ids,
+                'seats' => $seats->map(function($seat) {
+                    return [
+                        'id' => $seat->id,
+                        'seat_number' => $seat->seat_number,
+                        'floor' => $seat->floor
+                    ];
+                }),
+                'passengers_data' => $booking->passengers_data,
+                'total_passengers' => $booking->total_passengers,
+                'total_price' => $booking->total_price,
+                'status' => $booking->status,
+                'created_at' => $booking->created_at,
+                'schedule' => $booking->schedule ? [
+                    'id' => $booking->schedule->id,
+                    'departure_time' => $booking->schedule->departure_time,
+                    'departure_date' => $booking->schedule->departure_date,
+                    'price' => $booking->schedule->price,
+                    'bus' => $booking->schedule->bus ? [
+                        'id' => $booking->schedule->bus->id,
+                        'name' => $booking->schedule->bus->name,
+                        'total_seats' => $booking->schedule->bus->total_seats
+                    ] : null,
+                    'route' => $booking->schedule->route ? [
+                        'id' => $booking->schedule->route->id,
+                        'origin' => $booking->schedule->route->origin,
+                        'destination' => $booking->schedule->route->destination
+                    ] : null
+                ] : null,
+                'payment' => $booking->payment ? [
+                    'id' => $booking->payment->id,
+                    'payment_code' => $booking->payment->payment_code,
+                    'amount' => $booking->payment->amount,
+                    'status' => $booking->payment->status,
+                    'payment_method' => $booking->payment->payment_method
+                ] : null
+            ];
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Data booking',
-            'data' => $bookings
+            'data' => $formattedBookings
         ], 200);
     }
 
@@ -121,39 +192,14 @@ class BookingController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Booking dibatalkan',
-            'data' => $booking
-        ], 200);
-    }
-
-    public function checkAvailability(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'schedule_id' => 'required|exists:schedules,id'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $schedule = Schedule::with(['bus.seats' => function($query) {
-            $query->where('is_available', true);
-        }])->find($request->schedule_id);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Cek ketersediaan',
             'data' => [
-                'schedule' => $schedule,
-                'available_seats' => $schedule->bus->seats
+                'id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'status' => $booking->status
             ]
         ], 200);
     }
 
-    // METHOD UNTUK PAYMENT 
     public function checkPaymentStatus(Request $request, $id)
     {
         $booking = Booking::with('payment')->find($id);
@@ -187,10 +233,9 @@ class BookingController extends Controller
                     'amount' => $booking->payment->amount,
                     'method' => $booking->payment->payment_method,
                     'payment_status' => $booking->payment->status,
-                    'paid_at' => $booking->payment->paid_at,
-                    'expired_at' => $booking->payment->expired_at
+                    'paid_at' => $booking->payment->paid_at
                 ] : null,
-                'is_paid' => $booking->payment && $booking->payment->status === 'success'
+                'is_paid' => $booking->payment && $booking->payment->status === 'paid'
             ]
         ], 200);
     }

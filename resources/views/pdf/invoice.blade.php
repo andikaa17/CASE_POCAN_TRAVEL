@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $booking->booking_code }}</title>
+    <title>Invoice {{ $booking->booking_code ?? 'N/A' }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -76,10 +76,10 @@
 </head>
 <body>
     <div class="header">
-        <h1>{{ $company['name'] }}</h1>
+        <h1>{{ $company['name'] ?? 'CAN TRAVEL' }}</h1>
         <div class="company-info">
-            <p>{{ $company['address'] }}</p>
-            <p>Telp: {{ $company['phone'] }} | Email: {{ $company['email'] }}</p>
+            <p>{{ $company['address'] ?? 'Jl. Raya No. 123, Jakarta' }}</p>
+            <p>Telp: {{ $company['phone'] ?? '021-1234567' }} | Email: {{ $company['email'] ?? 'info@cantravel.com' }}</p>
         </div>
     </div>
 
@@ -87,22 +87,22 @@
         <table>
             <tr>
                 <td><strong>Invoice Number:</strong></td>
-                <td>INV-{{ $booking->booking_code }}</td>
+                <td>INV-{{ $booking->booking_code ?? 'N/A' }}</td>
                 <td><strong>Tanggal:</strong></td>
-                <td>{{ $date }}</td>
+                <td>{{ $date ?? now()->format('d/m/Y H:i:s') }}</td>
             </tr>
             <tr>
                 <td><strong>Customer:</strong></td>
-                <td>{{ $booking->user->name }}</td>
+                <td>{{ $booking->user->name ?? '-' }}</td>
                 <td><strong>Email:</strong></td>
-                <td>{{ $booking->user->email }}</td>
+                <td>{{ $booking->user->email ?? '-' }}</td>
             </tr>
             <tr>
                 <td><strong>Phone:</strong></td>
-                <td>{{ $booking->user->phone }}</td>
+                <td>{{ $booking->user->phone ?? '-' }}</td>
                 <td><strong>Status:</strong></td>
-                <td class="{{ $booking->status === 'paid' ? 'status-paid' : 'status-pending' }}">
-                    {{ strtoupper($booking->status) }}
+                <td class="{{ ($booking->status ?? 'pending') === 'paid' ? 'status-paid' : 'status-pending' }}">
+                    {{ strtoupper($booking->status ?? 'PENDING') }}
                 </td>
             </tr>
         </table>
@@ -114,28 +114,56 @@
             <tr>
                 <th>No</th>
                 <th>Nama Penumpang</th>
+                <th>Umur</th>
+                <th>No. Identitas</th>
+                <th>No. HP</th>
                 <th>Kursi</th>
-                <th>Rute</th>
-                <th>Keberangkatan</th>
                 <th>Harga</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($booking->passengers_data as $index => $passenger)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>{{ $passenger['passenger_name'] }}</td>
-                <td>{{ $booking->seat_ids[$index] ?? '-' }}</td>
-                <td>{{ $booking->schedule->route->origin }} - {{ $booking->schedule->route->destination }}</td>
-                <td>{{ $booking->schedule->departure_date }} {{ $booking->schedule->departure_time }}</td>
-                <td>Rp {{ number_format($booking->schedule->price, 0, ',', '.') }}</td>
-            </tr>
-            @endforeach
+            @php
+                $passengersData = $booking->passengers_data ?? [];
+                $seatIds = $booking->seat_ids ?? [];
+                
+                // Ambil data kursi dari database
+                $seats = [];
+                if (!empty($seatIds)) {
+                    $seats = \App\Models\Seat::whereIn('id', $seatIds)
+                        ->get()
+                        ->keyBy('id')
+                        ->toArray();
+                }
+            @endphp
+            
+            @forelse($passengersData as $index => $passenger)
+                @php
+                    $seatId = $seatIds[$index] ?? null;
+                    $seatNumber = $seatId && isset($seats[$seatId]) 
+                        ? $seats[$seatId]['seat_number'] 
+                        : ($seatId ?? '-');
+                @endphp
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td>{{ $passenger['name'] ?? $passenger['passenger_name'] ?? '-' }}</td>
+                    <td>{{ $passenger['age'] ?? $passenger['umur'] ?? '-' }}</td>
+                    <td>{{ $passenger['id_card'] ?? $passenger['id_number'] ?? $passenger['identitas'] ?? '-' }}</td>
+                    <td>{{ $passenger['phone'] ?? $passenger['no_hp'] ?? '-' }}</td>
+                    <td><strong>{{ $seatNumber }}</strong></td>
+                    <td>Rp {{ number_format($booking->schedule->price ?? 0, 0, ',', '.') }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px;">
+                        <strong>Tidak ada data penumpang</strong>
+                    </td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
 
     <div class="total">
-        <p>Total: Rp {{ number_format($booking->total_price, 0, ',', '.') }}</p>
+        <p>Total: Rp {{ number_format($booking->total_price ?? 0, 0, ',', '.') }}</p>
     </div>
 
     <div class="footer">
