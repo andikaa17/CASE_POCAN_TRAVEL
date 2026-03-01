@@ -8,4 +8,6 @@ protected function schedule(Schedule $schedule)
     
     // TAMBAH INI: Cancel expired bookings setiap MENIT
     $schedule->command('bookings:cancel-expired')->everyMinute();
+
+    
 }

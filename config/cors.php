@@ -6,8 +6,8 @@ return [
     'allowed_methods' => ['*'],
     
     'allowed_origins' => [
-        'http://localhost:5173',  // Frontend Vite kamu
-        'http://127.0.0.1:5173'
+        'http://localhost:5173',  // untuk development
+        'https://can-travel-d478d.web.app',
     ],
     
     'allowed_origins_patterns' => [],

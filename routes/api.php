@@ -9,6 +9,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VerificationController;
 
+
 Route::get('/ping', function() {
     return response()->json(['success' => true, 'message' => 'API JALAN!']);
 });
