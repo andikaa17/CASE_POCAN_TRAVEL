@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ===== TAMBAHIN INI! =====
+# Vue files
+/cantravel-fe
+/cantravel-fe.zip
+/package-lock.json
+/package.json
