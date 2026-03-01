@@ -13,15 +13,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-    $middleware->alias([
-        'api.key' => ApiKeyMiddleware::class,
-    ]);
-    
-    // ===== UNCOMMENT INI =====
-    $middleware->api(prepend: [
-        'api.key', // <-- UNCOMMENT!
-    ]);
-})
+        $middleware->alias([
+            'api.key' => ApiKeyMiddleware::class,
+        ]);
+        
+        // ===== TAMBAHKAN MIDDLEWARE CORS =====
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class, // <-- PENTING UNTUK CORS!
+            'api.key',
+        ]);
+        
+        // Atau kalo mau lebih sederhana:
+        // $middleware->api->prepend(\Illuminate\Http\Middleware\HandleCors::class);
+    })
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
